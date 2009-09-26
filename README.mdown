@@ -4,7 +4,7 @@ TapkuLibrary is a collection of iPhone UI classes intended for broad use in appl
 
 [http://tapku.com](http://tapku.com)
 
-[![](http://farm3.static.flickr.com/2650/3955573507_23c2781a9c_o.jpg)(http://www.flickr.com/photos/40064022@N02/3955573507/)
+[![](http://farm3.static.flickr.com/2650/3955573507_23c2781a9c_o.jpg)](http://www.flickr.com/photos/40064022@N02/3955573507/)
 
 Adding TapkuLibrary to your project
 ==============================
