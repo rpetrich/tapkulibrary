@@ -30,7 +30,7 @@
  */
 #import "TKCalendarMonthView.h"
 #import "NSDateAdditions.h"
-#import "TKCalendarMonthView.h"
+#import "TKCalendarMonthMarkView.h"
 #import "TKGlobal.h"
 #import "UIViewAdditions.h"
 #import "UIImageAdditions.h"
@@ -73,20 +73,20 @@
 @end
 @interface TKCalendarDayView : UIView {
 	NSString *str;
+	UIView *markView;
 	BOOL selected;
 	BOOL active;
 	BOOL today;
-	BOOL marked;
 }
 
-- (id) initWithFrame:(CGRect)frame string:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy marked:(BOOL)mark;
-- (void) setString:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy marked:(BOOL)mark;
+- (id) initWithFrame:(CGRect)frame string:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy markView:(UIView *)mv;
+- (void) setString:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy markView:(UIView *)mv;
 
 @property (copy,nonatomic) NSString *str;
 @property (assign,nonatomic) BOOL selected;
 @property (assign,nonatomic) BOOL active;
 @property (assign,nonatomic) BOOL today;
-@property (assign,nonatomic) BOOL marked;
+@property (retain,nonatomic) UIView *markView;
 
 @end
 
@@ -170,12 +170,36 @@
 	TKDateInformation info = [date dateInformation];
 	
 	NSMutableArray *ar = [[NSMutableArray alloc] initWithCapacity:days];
-	for(int i = 1; i <= days; i++){
-		info.day = i;
-		if(dataSource!=nil)
-			[ar addObject:[NSNumber numberWithBool:[dataSource calendarMonthView:self markForDay:[NSDate dateFromDateInformation:info]]]];
-		else
-			[ar addObject:[NSNumber numberWithBool:NO]];
+	if ([dataSource respondsToSelector:@selector(calendarMonthView:markViewForDay:)]) {
+		for(int i = 1; i <= days; i++){
+			info.day = i;
+			UIView *view = [dataSource calendarMonthView:self markViewForDay:[NSDate dateFromDateInformation:info]];
+			if (view)
+				[ar addObject:view];
+			else {
+				view = [[UIView alloc] initWithFrame:CGRectZero];
+				[ar addObject:view];
+				[view release];
+			}
+		}
+	} else if ([dataSource respondsToSelector:@selector(calendarMonthView:markForDay:)]) {
+		for(int i = 1; i <= days; i++){
+			info.day = i;
+			UIView *view;
+			if ([dataSource calendarMonthView:self markForDay:[NSDate dateFromDateInformation:info]])
+				view = [TKCalendarMonthMarkView alloc];
+			else
+				view = [UIView alloc];
+			view = [view initWithFrame:CGRectZero];
+			[ar addObject:view];
+			[view release];
+		}
+	} else {
+		for(int i = 1; i <= days; i++){
+			UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+			[ar addObject:view];
+			[view release];
+		}
 	}
 	
 	NSArray *array = [NSArray arrayWithArray:ar];
@@ -710,7 +734,7 @@
 		
 		TKCalendarDayView *dayView = [[TKCalendarDayView alloc] initWithFrame:CGRectMake((position - 1) * 46 - 1, line * 44, 47, 45)];
 		
-		[dayView setMarked:[[self.marks objectAtIndex:i-1] boolValue]];
+		[dayView setMarkView:[self.marks objectAtIndex:i-1]];
 		
 		if(isCurrentMonth && i==todayNumber)
 			[dayView setToday:YES];
@@ -771,7 +795,7 @@
 	for (NSInteger i=1; i<=self.marks.count; i++) {
 		TKCalendarDayView *dayView = (TKCalendarDayView *)[self viewWithTag:i];
 		
-		[dayView setMarked:[[self.marks objectAtIndex:i-1] boolValue]];
+		[dayView setMarkView:[self.marks objectAtIndex:i-1]];
 	}
 	[self setNeedsDisplay];
 }
@@ -810,7 +834,7 @@
 			//NSLog(@"--Hit");
 		} 
 		dayView.frame = CGRectMake((i - 1) * 46 - 1, 0, 47, 45);
-		[dayView setString:[NSString stringWithFormat:@"%d",lead] selected:NO active:NO today:NO marked:NO];
+		[dayView setString:[NSString stringWithFormat:@"%d",lead] selected:NO active:NO today:NO markView:nil];
 
 		[self addSubview:dayView];
 		[dayTiles addObject:dayView];
@@ -836,7 +860,7 @@
 		
 		BOOL today = isCurrentMonth && i==todayNumber ? YES : NO;
 		
-		[dayView setString:[NSString stringWithFormat:@"%d",i] selected:NO active:YES today:today marked:[[self.marks objectAtIndex:i-1] boolValue]];
+		[dayView setString:[NSString stringWithFormat:@"%d",i] selected:NO active:YES today:today markView:[self.marks objectAtIndex:i-1]];
 
 		
 		// Set the tag as the day view
@@ -867,7 +891,7 @@
 			if(dayView == nil) dayView = [[TKCalendarDayView alloc] initWithFrame:CGRectZero];
 
 			dayView.frame = CGRectMake((i - 1) * 46 - 1, line * 44, 47, 45);
-			[dayView setString:[NSString stringWithFormat:@"%d",counter] selected:NO active:NO today:NO marked:NO];
+			[dayView setString:[NSString stringWithFormat:@"%d",counter] selected:NO active:NO today:NO markView:nil];
 			
 			[self addSubview:dayView];
 			[dayTiles addObject:dayView];
@@ -999,23 +1023,23 @@
 
 
 @implementation TKCalendarDayView
-@synthesize selected,active,today,marked,str;
+@synthesize selected,active,today,markView,str;
 
-- (id) initWithFrame:(CGRect)frame string:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy marked:(BOOL)mark{
+- (id) initWithFrame:(CGRect)frame string:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy markView:(UIView *)mv{
 	
 	if(self = [super initWithFrame:frame]){
-		[self setString:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy marked:(BOOL)mark];
+		[self setString:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy markView:(UIView *)mv];
 	}
 	return self;
 
 }
-- (void) setString:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy marked:(BOOL)mark{
+- (void) setString:(NSString*)string selected:(BOOL)sel active:(BOOL)act today:(BOOL)tdy markView:(UIView *)mv{
 	[str release];
 	str = [string copy];
 	selected = sel;
 	active = act;
 	today = tdy;
-	marked = mark;
+	[self setMarkView:mv];
 	[self setNeedsDisplay];
 }
 
@@ -1028,7 +1052,6 @@
 		
 		active = YES;
 		today = NO;
-		marked = NO;
 		selected = NO;
 		self.opaque = YES;
     }
@@ -1067,25 +1090,12 @@
 		   withFont: [UIFont boldSystemFontOfSize:22] 
 	  lineBreakMode: UILineBreakModeWordWrap 
 		  alignment: UITextAlignmentCenter];
-	
-	if(marked){
-		CGContextRef context = UIGraphicsGetCurrentContext();
-		if(selected || today)
-			CGContextSetRGBFillColor(context, 1, 1, 1, 1.0);
-		else
-			CGContextSetRGBFillColor(context, 75.0/255.0, 92/255.0, 111/255.0, 1.0);
-		
-		CGContextSetLineWidth(context, 0.0);
-		CGContextAddEllipseInRect(context, CGRectMake(self.frame.size.width/2 - 2, 45 - 10, 4, 4));
-		CGContextFillPath(context);
-	}
-	
-	
-	
+
 }
 
 
 - (void)dealloc {
+	[markView release];
 	[str release];
     [super dealloc];
 }
@@ -1093,22 +1103,31 @@
 - (void) setSelected:(BOOL)select{
 	selected = select;
 	[self setNeedsDisplay];
+	if ([markView respondsToSelector:@selector(setSelected:)])
+		[(id)markView setSelected:selected | today];
 }
 - (void) setToday:(BOOL)tdy{
 	if(tdy == today) return;
 	today = !today;
 	[self setNeedsDisplay];
+	if ([markView respondsToSelector:@selector(setSelected:)])
+		[(id)markView setSelected:selected | today];
 }
 - (void) setActive:(BOOL) act{
 	if(active == act)return;
 	active = act;
 	[self setNeedsDisplay];
 }
-- (void) setMarked:(BOOL)mark{
-	if(marked == mark) return;
-	marked = !marked;
-	[self setNeedsDisplay];
-	
+- (void) setMarkView:(UIView *)view{
+	if(markView == view) return;
+	[markView removeFromSuperview];
+	[markView release];
+	markView = [view retain];
+	view.frame = self.bounds;
+	view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+	if ([view respondsToSelector:@selector(setSelected:)])
+		[(id)view setSelected:selected | today];
+	[self addSubview:view];
 }
 
 @end

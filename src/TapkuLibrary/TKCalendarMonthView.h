@@ -68,8 +68,9 @@
 
 
 @protocol TKCalendarMonthViewDataSource<NSObject>
-@required
+@optional
 - (BOOL) calendarMonthView:(TKCalendarMonthView*)monthView markForDay:(NSDate*)date;
+- (UIView *)calendarMonthView:(TKCalendarMonthView *)monthView markViewForDay:(NSDate *)date;
 @end
 
 
